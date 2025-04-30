@@ -1,0 +1,8 @@
+scrapy 
+scrapy-playwright 
+playwright
+pydispatcher
+beautifulsoup4
+lxml
+selenium
+seleniumbase

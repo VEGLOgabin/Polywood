@@ -1,0 +1,28 @@
+Linux
+Open a terminal in the directory where your spiders are located and run the following commands:
+
+pip install -r requirements.txt
+
+playwright install
+
+node -v  # (Be sure that node js is installed on the system)
+
+python polywood.py   | python3 polywood.py
+
+---------------------------------------------------------------------------------------------
+
+Windows
+Open Command Prompt or PowerShell in this directory where your spiders are located and run the following commands:
+
+pip install -r requirements.txt
+
+playwright install
+
+node -v  # (Be sure that node js is installed on the system)
+
+python polywood.py   | python3 polywood.py
+
+
+---------------------------------------------------------------------------------------------------------
+
+The final product data scraped should be stored in the output directory. The other utility data scraped should be stored in the utilities directory, although this is not strictly necessary.
