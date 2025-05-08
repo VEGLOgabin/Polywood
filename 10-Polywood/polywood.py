@@ -28,7 +28,7 @@ class AcsSpider(scrapy.Spider):
         "RETRY_TIMES": "6"
     }
 
-    FILENAME = "output/output_1732302622.json"
+    FILENAME = "output/output.json"
 
     def restart(self):
         return Driver(uc=True, page_load_strategy='eager', do_not_track=True, block_images=True, ad_block=True, headless=False)

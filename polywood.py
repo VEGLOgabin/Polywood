@@ -1,4 +1,4 @@
-import threading
+# import threading
 import traceback
 import time
 from selenium.webdriver.support.ui import WebDriverWait
@@ -28,7 +28,7 @@ class AcsSpider(scrapy.Spider):
         "RETRY_TIMES": "6"
     }
 
-    FILENAME = "output/output_1732302622.json"
+    FILENAME = "output/output.json"
 
     def restart(self):
         return Driver(uc=True, page_load_strategy='eager', do_not_track=True, block_images=True, ad_block=True, headless=False)
@@ -51,14 +51,15 @@ class AcsSpider(scrapy.Spider):
 
     def get_categ_links(self, response):
         soup = BeautifulSoup(response.body, 'html.parser')
-        anchors = soup.find_all('a')
+        # anchors = soup.find_all('a')
+        anchors=soup.find_all('a', class_ = "peer pb-sm -mb-sm block")
         for anchor in anchors:
             try:
-                if anchor['href'].endswith('.html'):
-                    if '/styles/' in anchor['href'] or '/collections/' in anchor['href']:
+                if anchor['href']:
+                    if '/pages/' in anchor['href'] or '/collections/' in anchor['href']:
                         if anchor['href'] != 'https://www.polywood.com/styles/quick-ship-products.html':
                             yield scrapy.Request(
-                                url=anchor['href'] + '?&sp=1500',
+                                url=  "https://www.polywood.com" + anchor['href'],
                                 callback=self.get_products_links,
                             )
             except:
@@ -139,13 +140,6 @@ class AcsSpider(scrapy.Spider):
                         row['Features'.upper()] = dsc.strip()
                     except:
                         pass
-                    # try:
-                    #     row['Images'] = list(set(
-                    #         div['src'].replace('w_200,h_160,c_fill,q_80', 'w_700,h_700,c_pad,q_80')
-                    #         for div in soup.find('div', attrs={'data-gallery-type': 'thumbnail'}).find_all('img')
-                    #     ))
-                    # except:
-                    #     row['Images'] = []
 
                     try:
                         i=0
@@ -215,14 +209,14 @@ class AcsSpider(scrapy.Spider):
                     traceback.print_exc()
 
         driver1 = self.restart()
-        s1 = threading.Thread(target=scrape, args=(driver1, lnks, current,))
-        s1.start()
-        s1.join()
 
         try:
-            driver1.quit()
-        except:
-            pass
+            scrape(driver1, lnks, current)
+        finally:
+            try:
+                driver1.quit()
+            except Exception as e:
+                print(f"Error quitting driver: {e}")
 
 
 def run_spiders():
