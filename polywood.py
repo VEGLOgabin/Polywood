@@ -42,22 +42,30 @@ async def get_category_links(page):
     soup = await get_page_content(page, SOURCE_SITE)
     links = []
     if soup:
-        anchors = soup.find_all('a', class_="peer pb-sm -mb-sm block")
-        for a in anchors:
-            print("---------Category link a tag text ----------")
-            print(a.get_text())
-            href = a.get("href", "")
-            if ('/pages/' in href or '/collections/' in href) and 'quick-ship-products' not in href:
-                links.append(SOURCE_SITE + href)
+        # anchors = soup.find_all('a', class_="peer pb-sm -mb-sm block")
+        categories = soup.find_all("div", class_ = "w-full block")
+        if categories:
+            # categories = [item.find("a").text.strip() for item in categories]
+            # print(categories)
+            for item in categories:
+                # print("---------Category link a tag text ----------")
+                main_category_name = item.find("a").get_text(strip = True)
+                collections_a = item.find_all('a', class_="peer pb-sm -mb-sm block")
+                collections_a_link = [[main_category_name,a_link.text.strip(), a_link.get("href")] for a_link in collections_a]
+                # print(collections_a_link)
+                for data in collections_a_link:
+                    if data[0]!='New & Featured' and "View All" not in  data[1] and "Quick Ship" not in data[1]:
+                        links.append([[data[0], data[1]], "https://www.polywood.com"+data[2]])
+
         logging.info(f"Found {len(links)} category links.")
     else:
         logging.warning("Failed to load category page.")
     return links
 
 
-async def get_product_links(page, category_url):
+async def get_product_links(page, category_url, current):
     links = []
-    current = []
+    
     page_num = 1
 
     base_url = category_url.split('?')[0]
@@ -75,27 +83,20 @@ async def get_product_links(page, category_url):
             if not products:
                 logging.info(f"No more products found on page {page_num} of {category_url}")
                 break
-
-            if page_num == 1:
-                if '/collections/' in category_url:
-                    h1_tag = soup.find('h1')
-                    if h1_tag:
-                        current = [h1_tag.text.replace('Collection', '').strip()]
-                else:
-                    items = soup.find('ul', class_='items').find_all('li', recursive=False)
-                    if len(items) >= 2:
-                        current = [items[-2].text.strip(), items[-1].text.strip()]
-
+            one_page_product = []
             for product in products:
-                print("---------Product link a tag text ----------")
-                print(product.get_text())
                 href = product.get("href")
                 if href:
                     full_url = "https://www.polywood.com" + href
-                    # print(full_url)
-                    links.append(full_url)
+                    one_page_product.append(full_url)
+            if len(products)>24:
+                one_page_product = list(set(one_page_product)) 
+
+            if one_page_product:
+                links.extend(one_page_product)           
 
             logging.info(f"Found {len(products)} product links on page {page_num} of {category_url}.")
+            # break  # For test
 
             # Check if "Next" page exists
             nav = soup.find('nav', role='navigation')
@@ -123,80 +124,94 @@ async def get_product_details(page, url, current, scraped_links):
         soup = await get_page_content(page, url)
         if not soup:
             return None
+        print(f"Url : {url}")
 
         row = {"Product Link": url}
-        row["Title"] = soup.find("h1").text.strip()
-        row["SKU"] = soup.find("div", itemprop="sku").text.strip()
-
+        row["Title"] = soup.find("h1", class_ = "h3").text.strip()
+        row["SKU"] = soup.find("p", id = "Sku-template--18905404735715__main").text.strip().replace("SKU", "")
+        # print(f"SKU : {row['SKU']}")
         if len(current) == 1:
             row["Collection"] = current[0].upper()
         else:
             row["Main Category"] = current[0]
             row["Collection"] = current[1]
 
-        overview = soup.find(class_='product attribute overview')
-        if overview:
-            row["Overview"] = overview.text.strip()
 
         try:
-            desc_items = soup.find(class_='product-info-feature-pillars').find_all('li')
-            row["Description"] = "\n".join(li.text.strip() for li in desc_items)
+            desc_span = soup.find('span', class_='metafield-multi_line_text_field')
+            row["Description"] = desc_span.get_text(separator=' ', strip=True)
+            # print(row["Description"])
         except Exception as e:
-            logging.warning(f"Description missing for {url}: {e}")
+            logging.warning(f"Description missing or invalid for {url}: {e}")
 
         try:
-            feat_items = soup.find(class_='features').find_all('li')
-            row["FEATURES"] = "\n".join(li.text.strip() for li in feat_items)
+            accordion_div = soup.find('div', id=lambda x: x and x.startswith("accordion-content-collapsible_tab"))
+            if accordion_div:
+                features_div = accordion_div.find('div', class_='overflow-hidden')
+                if features_div:
+                    features_text = features_div.get_text(separator='\n', strip=True)
+                    row["FEATURES"] = features_text
+                    # print("-------------------------")
+                    # print("FEATURES")
+                    # print(row["FEATURES"])
+                    # print("-------------------------")
+                else:
+                    raise ValueError("Couldn't find 'overflow-hidden' div.")
+            else:
+                raise ValueError("Couldn't find accordion content div.")
         except Exception as e:
             logging.warning(f"Features missing for {url}: {e}")
 
+
         # Images
         images = []
-        thumbs = soup.find('div', attrs={'data-gallery-type': 'thumbnail'})
+        thumbs = soup.find_all('img', class_="w-full block h-full absolute inset-0 square object-cover")
         if thumbs:
-            for img in thumbs.find_all('img'):
-                src = img.get("src", "").replace("w_200,h_160,c_fill,q_80", "w_700,h_700,c_pad,q_80") \
-                                         .replace("w_100,h_80,c_fill,q_80", "w_700,h_700,c_pad,q_80")
-                images.append(src)
-        else:
-            gallery = soup.find('div', class_='gallery-placeholder')
-            for img in gallery.find_all('img'):
-                images.append(img.get("src", ""))
+            for img in thumbs:
+                src = img.get("src", "").replace("width=90", "width=1200")
+                if "//www." in src:
+                    images.append(src.replace("//", ""))
+                else:
+                    images.append(src)
+
 
         row["Images"] = list(set(images))
-
+        # print(row["Images"])
         # Dimensions
         try:
-            dim_main = soup.find(class_='dimensions one two weight-dimensions')
-            row["Overall Dimensions"] = dim_main.find('p').text.split(':')[1].strip()
-            trs = dim_main.find_all('tr')
-            row["WEIGHT & DIMENSIONS"] = [
-                {tr.find_all('td')[0].text.strip(): tr.find_all('td')[1].text.strip()} for tr in trs
-            ]
+            dim_table = soup.find('table', class_='table w-full border border-[#eaeaea]')
+            trs = dim_table.find_all('tr')
+            
+            row["WEIGHT & DIMENSIONS"] = []
+            for tr in trs:
+                tds = tr.find_all('td')
+                if len(tds) == 2:
+                    label = tds[0].text.strip()
+                    value = tds[1].text.strip()
+                    if label!= "Assembly Instructions":
+                        row["WEIGHT & DIMENSIONS"].append({label: value})
+                    # Save overall dimensions in a single field if needed
+                    if "Overall Width" in label:
+                        row["Overall Dimensions"] = value  # or collect width, height, depth and format
+
+                # print(row["WEIGHT & DIMENSIONS"])
         except Exception as e:
             logging.warning(f"Dimensions missing or invalid for {url}: {e}")
 
+
         # Assembly Info
         try:
-            for div in soup.find(class_='links').find_all('div'):
-                if 'assembly information' in div.text.lower():
-                    row['Assembly Information'] = SOURCE_SITE + div.find('a')['href']
-                    break
+            for tr in trs:
+                tds = tr.find_all('td')
+                if len(tds) == 2 and "Assembly Instructions" in tds[0].text:
+                    link = tds[1].find('a')
+                    if link:
+                        row['Assembly Information'] = link['href']
+
+                        # print(row['Assembly Information'])
         except Exception as e:
             logging.warning(f"Assembly info missing for {url}: {e}")
 
-        # SKU Options
-        try:
-            row["SKU Options"] = []
-            options = soup.find('div', class_='option-groupings')
-            if options:
-                for opt in options.find_all('div', class_='grouping-option-value'):
-                    row["SKU Options"].append({
-                        "SKU": opt.get("option-sku", "").strip(),
-                        "Color": opt.get("option-label", "").strip()
-                    })
-        except Exception as e:
-            logging.error(f"Error extracting SKU options from {url}: {e}")
 
         return row
 
@@ -219,7 +234,7 @@ async def main():
         category_links = await get_category_links(page)
 
         for category_url in category_links:
-            product_links, current = await get_product_links(page, category_url)
+            product_links, current = await get_product_links(page, category_url[1], current=category_url[0])
             for product_url in product_links:
                 product_data = await get_product_details(page, product_url, current, scraped_links)
                 if product_data:
