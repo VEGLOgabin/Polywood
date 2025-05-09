@@ -53,35 +53,6 @@ async def get_category_links(page):
     return links
 
 
-# async def get_product_links(page, category_url):
-#     soup = await get_page_content(page, category_url)
-#     links = []
-#     current = []
-
-#     if not soup:
-#         logging.warning(f"Skipping category {category_url} due to missing content.")
-#         return [], []
-
-#     try:
-#         products = soup.find_all('a', class_='product-card--simple-media__image')
-#         if '/collections/' in category_url:
-#             current = [soup.find('h1').text.replace('Collection', '').strip()]
-#         else:
-#             items = soup.find('ul', class_='items').find_all('li', recursive=False)
-#             current = [items[-2].text.strip(), items[-1].text.strip()]
-
-#         for product in products:
-#             href = "https://www.polywood.com" + product.get("href")
-#             print(href)
-#             if href:
-#                 links.append(href)
-
-#         logging.info(f"Found {len(links)} product links in {category_url}.")
-#     except Exception as e:
-#         logging.error(f"Error getting product links from {category_url}: {e}")
-#     return links, current
-
-
 async def get_product_links(page, category_url):
     links = []
     current = []
