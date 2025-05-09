@@ -44,6 +44,8 @@ async def get_category_links(page):
     if soup:
         anchors = soup.find_all('a', class_="peer pb-sm -mb-sm block")
         for a in anchors:
+            print("---------Category link a tag text ----------")
+            print(a.get_text())
             href = a.get("href", "")
             if ('/pages/' in href or '/collections/' in href) and 'quick-ship-products' not in href:
                 links.append(SOURCE_SITE + href)
@@ -85,6 +87,8 @@ async def get_product_links(page, category_url):
                         current = [items[-2].text.strip(), items[-1].text.strip()]
 
             for product in products:
+                print("---------Product link a tag text ----------")
+                print(product.get_text())
                 href = product.get("href")
                 if href:
                     full_url = "https://www.polywood.com" + href
